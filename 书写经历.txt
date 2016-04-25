@@ -1,0 +1,2 @@
+1. FLV音频不能写入ADTS头部，而TS需要，否则得设置extra_data
+2. 264数据只要带SPS和PPS都行
