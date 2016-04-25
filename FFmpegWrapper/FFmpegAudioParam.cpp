@@ -75,3 +75,9 @@ bool FFmpegAudioParam::isDiff( const FFmpegAudioParam& other )
 		|| sampleRate != other.sampleRate);
 
 }
+
+bool FFmpegAudioParam::operator==(const FFmpegAudioParam& other) const
+{
+	return channels == other.channels && sampleRate == other.sampleRate
+		&& sampleFormat == other.sampleFormat && codecId == other.codecId;
+}

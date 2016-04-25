@@ -4,12 +4,25 @@
 
 #include "stdafx.h"
 
+void SetPacketKey(AVPacket* pack, bool key)
+{
+	if (key)
+		pack->flags |= AV_PKT_FLAG_KEY;
+	else
+		pack->flags &= ~AV_PKT_FLAG_KEY;
+}
+
+bool isPacketKey(AVPacket* pack)
+{
+	return pack->flags & AV_PKT_FLAG_KEY;
+}
+
 // TODO: 在 STDAFX.H 中
 // 引用任何所需的附加头文件，而不是在此文件中引用
 
-void FlipYUV( AVFrame* pFrame, AVCodecContext * pContext, bool bFlipV, bool bFlipUV)
+void FlipYUV(AVFrame* pFrame, AVCodecContext * pContext, bool bFlipV, bool bFlipUV)
 {
-	if(bFlipV)
+	if (bFlipV)
 	{
 		// 进行反转
 		pFrame->data[0] += pFrame->linesize[0] * (pContext->height - 1);
@@ -19,7 +32,7 @@ void FlipYUV( AVFrame* pFrame, AVCodecContext * pContext, bool bFlipV, bool bFli
 		pFrame->data[2] += pFrame->linesize[2] * (pContext->height / 2 - 1);
 		pFrame->linesize[2] *= -1;
 	}
-	if(bFlipUV){
+	if (bFlipUV){
 		std::swap(pFrame->data[1], pFrame->data[2]);
 	}
 }
@@ -30,8 +43,8 @@ AVSampleFormat SelectBestFormat(AVCodec* audioCodec, AVSampleFormat dstFmt)
 	{
 		// try to find the PixelFormat required by the input param,
 		// use the default PixelFormat directly if required format not found
-		const enum AVSampleFormat *p= audioCodec->sample_fmts;
-		for ( ; *p != AV_SAMPLE_FMT_NONE; p ++)
+		const enum AVSampleFormat *p = audioCodec->sample_fmts;
+		for (; *p != AV_SAMPLE_FMT_NONE; p++)
 		{
 			if (*p == dstFmt)
 				break;
@@ -51,13 +64,13 @@ AVPixelFormat SelectBestFormat(AVCodec* videoCodec, AVPixelFormat dstFmt)
 	{
 		// try to find the PixelFormat required by the input param,
 		// use the default PixelFormat directly if required format not found
-		const enum PixelFormat *p= videoCodec->pix_fmts;
-		for ( ; *p != PIX_FMT_NONE; p ++)
+		const enum AVPixelFormat *p = videoCodec->pix_fmts;
+		for (; *p != AV_PIX_FMT_NONE; p++)
 		{
 			if (*p == dstFmt)
 				break;
 		}
-		if (*p == PIX_FMT_NONE)
+		if (*p == AV_PIX_FMT_NONE)
 			return videoCodec->pix_fmts[0];
 		else
 			return *p;

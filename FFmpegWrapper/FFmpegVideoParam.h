@@ -74,42 +74,42 @@ struct AVCodecContext;
 class FFMPEG_EXPORT FFmpegVideoParam
 {
 public:
-    ///
-    /// @brief  Constructor for initializing an object of FFmpegVideoParam
-    ///
-    ///	@param  [in] width          The width of the video frame, must be greater than 0
-    ///	@param  [in] height         The height of the video frame, must be greater than 0
-    ///	@param  [in] pixelFormat    PixelFormat enum representing the pixel format of the source video frame
-    ///	@param  [in] bitRate        The target bit rate of the target video stream, must be greater than 0
-    ///	@param  [in] frameRate      The frame rate of the target video, must be greater than 0
-    ///	@param  [in] videoCodecName The name of the video codec which is going to be used in encoding/decoding
-    ///
-    FFmpegVideoParam(int width, int height, int pixelFormat, int bitRate, int frameRate, int videoCodecId = 0);
+	///
+	/// @brief  Constructor for initializing an object of FFmpegVideoParam
+	///
+	///	@param  [in] width          The width of the video frame, must be greater than 0
+	///	@param  [in] height         The height of the video frame, must be greater than 0
+	///	@param  [in] pixelFormat    PixelFormat enum representing the pixel format of the source video frame
+	///	@param  [in] bitRate        The target bit rate of the target video stream, must be greater than 0
+	///	@param  [in] frameRate      The frame rate of the target video, must be greater than 0
+	///	@param  [in] videoCodecName The name of the video codec which is going to be used in encoding/decoding
+	///
+	FFmpegVideoParam(int width, int height, int pixelFormat, int bitRate, int frameRate, int videoCodecId = 0);
 
-    ///
-    /// @brief  Constructor for initializing an empty FFmpegVideoParam object
-    ///
-    FFmpegVideoParam();
+	///
+	/// @brief  Constructor for initializing an empty FFmpegVideoParam object
+	///
+	FFmpegVideoParam();
 
-    ///
-    /// @brief  Destructor
-    ///
-    virtual ~FFmpegVideoParam();
+	///
+	/// @brief  Destructor
+	///
+	virtual ~FFmpegVideoParam();
 
-    ///
-    ///	@brief  Judge whether a FFmpegVideoParam object is empty
-    ///	
-    bool empty() const;
+	///
+	///	@brief  Judge whether a FFmpegVideoParam object is empty
+	///	
+	bool empty() const;
 
 	bool Read(AVCodecContext* ctx);
 	bool isDiff(AVCodecContext* ctx);
 public:
-    int width;                  ///< The width of the video
-    int height;                 ///< The height of the video
-    int pixelFormat;    ///< The pixel format of the video
-    int bitRate;                ///< The bit rate of the video
-    int frameRate;              ///< The frame rate of the video
-    int codecId; ///< The name of the video codec
+	int width;                  ///< The width of the video
+	int height;                 ///< The height of the video
+	int pixelFormat;    ///< The pixel format of the video
+	int bitRate;                ///< The bit rate of the video
+	int frameRate;              ///< The frame rate of the video
+	int codecId; ///< The name of the video codec
 };
 
 #endif//FFmpegVideoParam_H

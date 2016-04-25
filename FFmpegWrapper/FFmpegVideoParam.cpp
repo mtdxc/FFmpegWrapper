@@ -25,17 +25,17 @@
 #include "FFmpegVideoParam.h"
 
 FFmpegVideoParam::FFmpegVideoParam(int width, int height, int pixelFormat, int bitRate, int frameRate, int videoCodecId) :
-    width(width), height(height), pixelFormat(pixelFormat), bitRate(bitRate), frameRate(frameRate), codecId(videoCodecId)
+width(width), height(height), pixelFormat(pixelFormat), bitRate(bitRate), frameRate(frameRate), codecId(videoCodecId)
 {
-    // valid the arguments
-    if (width < 1 || height < 1 || pixelFormat == PIX_FMT_NONE || bitRate < 1 || frameRate < 1)
-    {
-        throw std::invalid_argument("The arguments for the constructor of FFmpegVideoParam is invalid.");
-    }
+	// valid the arguments
+	if (width < 1 || height < 1 || pixelFormat == AV_PIX_FMT_NONE || bitRate < 1 || frameRate < 1)
+	{
+		throw std::invalid_argument("The arguments for the constructor of FFmpegVideoParam is invalid.");
+	}
 }
 
 FFmpegVideoParam::FFmpegVideoParam() :
-    width(0), height(0), pixelFormat(PIX_FMT_NONE), bitRate(0), frameRate(0), codecId(0)
+width(0), height(0), pixelFormat(AV_PIX_FMT_NONE), bitRate(0), frameRate(0), codecId(0)
 {
 }
 
@@ -45,11 +45,11 @@ FFmpegVideoParam::~FFmpegVideoParam()
 
 bool FFmpegVideoParam::empty() const
 {
-    return width < 1 && height < 1 && pixelFormat == PIX_FMT_NONE  && 
-        bitRate < 1 && frameRate < 1 || codecId == 0;
+	return width < 1 && height < 1 && pixelFormat == AV_PIX_FMT_NONE  &&
+		bitRate < 1 && frameRate < 1 || codecId == 0;
 }
 
-bool FFmpegVideoParam::Read( AVCodecContext* ctx )
+bool FFmpegVideoParam::Read(AVCodecContext* ctx)
 {
 	width = ctx->width;
 	height = ctx->height;
@@ -59,7 +59,7 @@ bool FFmpegVideoParam::Read( AVCodecContext* ctx )
 	return !empty();
 }
 
-bool FFmpegVideoParam::isDiff( AVCodecContext* ctx )
+bool FFmpegVideoParam::isDiff(AVCodecContext* ctx)
 {
-	return (height!=ctx->height||width!=ctx->width||pixelFormat!=ctx->pix_fmt);
+	return (height != ctx->height || width != ctx->width || pixelFormat != ctx->pix_fmt);
 }

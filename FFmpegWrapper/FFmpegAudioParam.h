@@ -57,39 +57,41 @@ struct AVCodecContext;
 class FFMPEG_EXPORT FFmpegAudioParam
 {
 public:
-    ///
-    /// @brief  Constructor for initializing an object of FFmpegAudioParam
-    ///
-    /// @param  [in] sampleRate     The sample rate of the audio, must be greater than 0
-    /// @param  [in] channels       The number of channels in the audio, must be greater than 0
-    /// @param  [in] bitRate        The target bit rate of the target audio stream, must be greater than 0
-    /// @param  [in] audioCodecId	The id of the audio codec which is going to be used in encoding/decoding
-    ///
-    FFmpegAudioParam(int sampleRate, int channels, int bitRate, int audioCodecId = 0, AVSampleFormat sampleFormat = AV_SAMPLE_FMT_S16);
+	///
+	/// @brief  Constructor for initializing an object of FFmpegAudioParam
+	///
+	/// @param  [in] sampleRate     The sample rate of the audio, must be greater than 0
+	/// @param  [in] channels       The number of channels in the audio, must be greater than 0
+	/// @param  [in] bitRate        The target bit rate of the target audio stream, must be greater than 0
+	/// @param  [in] audioCodecId	The id of the audio codec which is going to be used in encoding/decoding
+	///
+	FFmpegAudioParam(int sampleRate, int channels, int bitRate,
+		int audioCodecId = 0, AVSampleFormat sampleFormat = AV_SAMPLE_FMT_S16);
 
-    ///
-    /// @brief  Constructor for initializing an empty FFmpegAudioParam object
-    ///
-    FFmpegAudioParam();
+	///
+	/// @brief  Constructor for initializing an empty FFmpegAudioParam object
+	///
+	FFmpegAudioParam();
 
-    ///
-    /// @brief  Destructor
-    ///
-    virtual ~FFmpegAudioParam();
+	///
+	/// @brief  Destructor
+	///
+	virtual ~FFmpegAudioParam();
 
 	bool Read(AVCodecContext* ctx);
 	bool isDiff(AVCodecContext* ctx);
 	bool isDiff(const FFmpegAudioParam& other);
-    ///
-    ///	@brief  Judge whether a FFmpegAudioParam object is empty
-    ///	
-    bool empty() const;
+	bool operator == (const FFmpegAudioParam& other) const;
+	///
+	///	@brief  Judge whether a FFmpegAudioParam object is empty
+	///	
+	bool empty() const;
 
 public:
-    int sampleRate;             ///< The sample rate of the audio
-    int channels;               ///< The number of audio channels
-    int bitRate;                ///< The bit rate of the audio
-    int codecId;			///< The name of the audio codec
+	int sampleRate;             ///< The sample rate of the audio
+	int channels;               ///< The number of audio channels
+	int bitRate;                ///< The bit rate of the audio
+	int codecId;			///< The name of the audio codec
 	AVSampleFormat sampleFormat;
 };
 

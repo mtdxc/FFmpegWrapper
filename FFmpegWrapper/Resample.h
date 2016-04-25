@@ -29,7 +29,7 @@ public:
 	// 关闭重采样器
 	bool Close();
 	/* 重采样
-	
+
 	@param unsigned char * input 输入缓冲区
 	@param int & len 缓冲区字节长度
 	@return unsigned char* 输出缓冲区，视情况可能是内部缓冲，或原始缓冲区
@@ -37,7 +37,7 @@ public:
 	unsigned char* Process(unsigned char* input, int& len);
 	/*
 	重采样，并填充帧
-	@param AVFrame * frame 填充的目的帧 
+	@param AVFrame * frame 填充的目的帧
 	@param unsigned char * input 输入缓冲区
 	@param int len 缓冲区字节长度
 	@return bool 成功则返回true

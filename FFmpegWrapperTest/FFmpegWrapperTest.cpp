@@ -64,16 +64,16 @@ void testEncoder()
 	/* increment frequency by 110 Hz per second */
 	tincr2 = 2 * M_PI * 110.0 / 44100 / 44100;
 
-	FFmpegVideoParam videoParam(352, 288, PIX_FMT_YUV420P, 400000, 25, AV_CODEC_ID_H264);//"libx264");
+	FFmpegVideoParam videoParam(352, 288, AV_PIX_FMT_YUV420P, 400000, 25, AV_CODEC_ID_H264);//"libx264");
 	FFmpegAudioParam audioParam(44100, 2, 64000, AV_CODEC_ID_AAC);//"libvo_aacenc");
 	FFmpegEncoder testVideo(videoParam, audioParam);
 	testVideo.open("test.flv");
 
 	/* get test video data */
-	tempFrame = avcodec_alloc_frame();
+  tempFrame = av_frame_alloc();
 	videoFramesize = testVideo.getVideoFrameSize();
-    videoData = static_cast<uint8_t *>(av_malloc(videoFramesize));
-	avpicture_fill((AVPicture *)tempFrame, videoData, PIX_FMT_YUV420P, 352, 288);
+	videoData = static_cast<uint8_t *>(av_malloc(videoFramesize));
+	avpicture_fill((AVPicture *)tempFrame, videoData, AV_PIX_FMT_YUV420P, 352, 288);
 	frameIndex = 0;
 
 	/* get test audio data */
@@ -179,6 +179,8 @@ int main(int argc, wchar_t* argv[])
 	if(argc>1)
 		nCmd = argv[1][0];
 	//else printf("enter cmd: "); nCmd = getchar();
+	FFmpegDecoder::split2("d:\\264.flv", "d:\\264.1.flv", 10, 30);
+	//FFmpegDecoder::split2("d:\\6.webm", "d:\\6.1.webm", 10, 30);
 
 	CTestM3U8 tmu;
 	//tmu.SetSegment(10,3,false);
