@@ -194,6 +194,9 @@ public:
 	int getRawFrameSize() const;
 	/// 返回当前读取的包(必须包含FFMPEG头文件后才能解析)
 	AVPacket* getCurPacket();
+	int seek(double sec);
+	static bool split(const char* src, const char* dst, double start, double end);
+	static bool split2(const char* src, const char* dst, double start, double end);
 private:
 
 	//////////////////////////////////////////////////////////////////////////

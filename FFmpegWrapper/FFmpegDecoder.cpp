@@ -60,7 +60,6 @@ FFmpegDecoder::~FFmpegDecoder()
 	}
 }
 
-
 //////////////////////////////////////////////////////////////////////////
 //
 //  Public properties
@@ -529,3 +528,223 @@ AVPacket* FFmpegDecoder::getCurPacket()
 	return currentPacket;
 }
 
+
+int FFmpegDecoder::seek(double sec) {
+	return av_seek_frame(inputContext, -1, sec * AV_TIME_BASE, AVSEEK_FLAG_ANY);
+}
+
+#include "FFmpegEncoder.h"
+bool FFmpegDecoder::split(const char * inFile, const char * outFile, double start, double end)
+{
+	try {
+		FFmpegDecoder dec;
+		dec.open(inFile);
+		FFmpegEncoder enc(dec.getVideoParam(), dec.getAudioParam());
+		enc.open(outFile);
+		dec.seek(start);
+		AVPacket* packet = NULL;
+		bool wait_key = false;
+		while (true)
+		{
+			int r = dec.readFrame();
+			if (r < 0) break;
+			// reach to split end
+			if (dec.getPresentTimeStamp() > end)
+				break;
+
+			if (dec.getPresentTimeStamp() < start) 
+			{// seek to before
+				if (r == 0) {//decode and cache last video frame
+					dec.decodeVideoFrame();
+					wait_key = true;
+				}
+				continue;
+			}
+			else {
+				AVPacket* pack = dec.getCurPacket();
+				if (r == 0 && wait_key) {
+					if (pack->flags & AV_PKT_FLAG_KEY) {
+						wait_key = false;
+						// save keyframe data
+						enc.writeVideoData(pack->data, pack->size, true, dec.getPresentTimeStamp() * 1000);
+					}
+					else {
+						// cache last 
+						dec.decodeVideoFrame();
+						enc.writeVideoFrame(dec.getVideoFrame(), pack->dts);
+					}
+				}
+				else {
+					if (r == 0) {
+						enc.writeAudioData(pack->data, pack->size, dec.getPresentTimeStamp() * 1000);
+					}
+					else {
+						enc.writeVideoData(pack->data, pack->size, pack->flags & AV_PKT_FLAG_KEY, dec.getPresentTimeStamp() * 1000);
+					}
+					// enc.writePacket(pack);
+				}
+			}
+		}
+	}
+	catch (...) {
+		return false;
+	}
+}
+
+#include "libavutil\error.h"
+bool FFmpegDecoder::split2(const char * in_filename, const char * out_filename, double start, double end)
+{
+	AVFormatContext *ifmt_ctx = NULL, *ofmt_ctx = NULL;
+	AVPacket pkt;
+	av_register_all();
+	int ret;
+	// open input
+	if ((ret = avformat_open_input(&ifmt_ctx, in_filename, 0, 0)) < 0) {
+		fprintf(stderr, "Could not open input file '%s'", in_filename);
+		goto end;
+	}
+
+	if ((ret = avformat_find_stream_info(ifmt_ctx, 0)) < 0) {
+		fprintf(stderr, "Failed to retrieve input stream information");
+		goto end;
+	}
+	av_dump_format(ifmt_ctx, 0, in_filename, 0);
+	// prepare output
+	avformat_alloc_output_context2(&ofmt_ctx, NULL, NULL, out_filename);
+	if (!ofmt_ctx) {
+		fprintf(stderr, "Could not create output context\n");
+		ret = AVERROR_UNKNOWN;
+		goto end;
+	}
+	// copy stream
+	for (size_t i = 0; i < ifmt_ctx->nb_streams; i++)
+	{
+		AVStream *in_stream = ifmt_ctx->streams[i];
+		AVCodecContext *in_codec = in_stream->codec;
+		AVStream *out_stream = avformat_new_stream(ofmt_ctx, in_codec->codec);
+		avcodec_copy_context(out_stream->codec, in_codec);
+		out_stream->time_base = in_stream->time_base;
+		ret = avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar);
+		out_stream->codecpar->codec_tag = 0;
+		if (in_codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+			// open video decoder and encoder
+			ret = avcodec_open(in_codec, avcodec_find_decoder(in_codec->codec_id));
+			if (ret < 0) { fprintf(stderr, "unable to find decoder %d\n", in_codec->codec_id); }
+			in_codec->refcounted_frames = 1;
+			ret = avcodec_open(out_stream->codec, avcodec_find_encoder(in_codec->codec_id));
+			if (ret < 0) { fprintf(stderr, "unable to find encoder %d\n", in_codec->codec_id); }
+		}
+	}
+	av_dump_format(ofmt_ctx, 0, out_filename, 1);
+	
+	// open output file
+	if (!(ofmt_ctx->flags & AVFMT_NOFILE)) {
+		ret = avio_open(&ofmt_ctx->pb, out_filename, AVIO_FLAG_WRITE);
+		if (ret < 0) {
+			fprintf(stderr, "Could not open output file '%s'\n", out_filename);
+			goto end;
+		}
+	}
+	ret = avformat_write_header(ofmt_ctx, NULL);
+	if (ret < 0) {
+		fprintf(stderr, "Error occurred when opening output file\n");
+		goto end;
+	}
+
+	// seek with start
+	ret = av_seek_frame(ifmt_ctx, -1, start * AV_TIME_BASE, AVSEEK_FLAG_BACKWARD);
+	if (ret < 0) {
+		fprintf(stderr, "Error occurred when seek to %f\n", start);
+		goto end;
+	}
+
+	int got_picture = 0;
+	AVFrame* last_pic = av_frame_alloc();
+	bool wait_key = false;
+	while (1) {
+		ret = av_read_frame(ifmt_ctx, &pkt);
+		if (ret < 0)
+			break;
+
+		AVStream* in_stream = ifmt_ctx->streams[pkt.stream_index];
+		AVStream* out_stream = ofmt_ctx->streams[pkt.stream_index];
+		double pts = pkt.pts * av_q2d(in_stream->time_base);
+		if (pts > end)
+			break;
+
+		/* copy packet */
+		//pkt.pts = av_rescale_q_rnd(pkt.pts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+		//pkt.dts = av_rescale_q_rnd(pkt.dts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+		//pkt.duration = av_rescale_q(pkt.duration, in_stream->time_base, out_stream->time_base);
+		// offset timestamp
+		pkt.pts -= start / av_q2d(in_stream->time_base);
+		pkt.dts -= start / av_q2d(in_stream->time_base);
+		pkt.pos = -1;
+
+		// is video
+		bool video = in_stream->codec->codec_type == AVMEDIA_TYPE_VIDEO;
+		// is keyframe
+		bool key = pkt.flags & AV_PKT_FLAG_KEY;
+		if (pkt.pts < 0) {
+			if (video) {
+				avcodec_decode_video2(in_stream->codec, last_pic, &got_picture, &pkt);
+				wait_key = true;
+			}
+			av_packet_unref(&pkt);
+			continue;
+		}
+		else {
+			if (video && wait_key) {
+				if (key)
+					wait_key = false;
+				else {
+					avcodec_decode_video2(in_stream->codec, last_pic, &got_picture, &pkt);
+					if (got_picture && last_pic) {
+						AVPacket out_pkt = {0};
+						av_init_packet(&out_pkt);
+						// vp8 crash?
+						avcodec_encode_video2(out_stream->codec, &out_pkt, last_pic, &got_picture);
+						if (got_picture) {
+							av_frame_unref(last_pic);
+							out_pkt.pts = pkt.pts;
+							out_pkt.dts = pkt.dts;
+							out_pkt.stream_index = pkt.stream_index;
+							ret = av_interleaved_write_frame(ofmt_ctx, &out_pkt);
+							if (ret < 0) {
+								fprintf(stderr, "Error muxing packet %lld\n", pkt.pts);
+								break;
+							}
+						}
+					}
+					av_packet_unref(&pkt);
+					continue;
+				}
+			}
+		}
+		ret = av_interleaved_write_frame(ofmt_ctx, &pkt);
+		if (ret < 0) {
+			fprintf(stderr, "Error muxing packet %lld\n", pkt.pts);
+			break;
+		}
+		av_packet_unref(&pkt);
+	}
+
+	av_write_trailer(ofmt_ctx);
+	av_frame_free(&last_pic);
+end:
+	// @todo
+	// avcodec_close();
+
+	avformat_close_input(&ifmt_ctx);
+
+	/* close output */
+	if (ofmt_ctx && !(ofmt_ctx->flags & AVFMT_NOFILE))
+		avio_closep(&ofmt_ctx->pb);
+	avformat_free_context(ofmt_ctx);
+
+	if (ret < 0 && ret != AVERROR_EOF) {
+		//fprintf(stderr, "Error occurred: %s\n", av_err2str(ret));
+		return 1;
+	}
+	return 0;
+}
