@@ -43,7 +43,7 @@ FFmpegDecoder::FFmpegDecoder()
 	decodeVideo = false;
 	decodeAudio = false;
 	opened = false;
-	currentPacket = new AVPacket();
+	currentPacket = (AVPacket*)av_mallocz(sizeof(AVPacket));
 	audioCodecContext = NULL;
 	videoCodecContext = NULL;
 	// register all codecs and demux
@@ -55,7 +55,8 @@ FFmpegDecoder::~FFmpegDecoder()
 	close();
 	if (currentPacket)
 	{
-		delete currentPacket;
+		av_packet_unref(currentPacket);
+		av_freep(currentPacket);
 		currentPacket = NULL;
 	}
 }
@@ -216,8 +217,9 @@ void FFmpegDecoder::open(const char *fileName)
 
 		// allocate output buffer
 		audioBufferSize = AVCODEC_MAX_AUDIO_FRAME_SIZE;
-		audioFrameSize = 0;
 		audioFrameBuffer = (uint8_t *)av_malloc(audioBufferSize);
+		audioFrameSize = 0;
+
 		audioPacketData = NULL;
 		audioPacketSize = 0; // no data in the packet now, for initialization
 	}
@@ -243,8 +245,9 @@ bool FFmpegDecoder::open(const FFmpegVideoParam& vPar, const FFmpegAudioParam& a
 		// 这应该是输出格式
 		if (codec->pix_fmts)
 			videoCodecContext->pix_fmt = SelectBestFormat(codec, (AVPixelFormat)vPar.pixelFormat);
-		if (avcodec_open(videoCodecContext, codec)<0)
+		if (avcodec_open(videoCodecContext, codec) < 0){
 			throw runtime_error("video codec open error");
+		}
 		decodeVideo = true;
 	}
 	if (aPar.codecId)
@@ -257,11 +260,16 @@ bool FFmpegDecoder::open(const FFmpegVideoParam& vPar, const FFmpegAudioParam& a
 		audioCodecContext = avcodec_alloc_context3(codec);
 		if (aPar.sampleRate) audioCodecContext->sample_rate = aPar.sampleRate;
 		if (aPar.channels) audioCodecContext->channels = aPar.channels;
-		if (aPar.sampleFormat&&codec->sample_fmts)
+		if (aPar.sampleFormat && codec->sample_fmts)
 			audioCodecContext->sample_fmt = SelectBestFormat(codec, aPar.sampleFormat);
-		if (avcodec_open(audioCodecContext, codec)<0)
+		if (avcodec_open(audioCodecContext, codec) < 0){
 			throw runtime_error("audio codec open error");
+		}
 		decodeAudio = true;
+		// allocate output buffer
+		audioBufferSize = AVCODEC_MAX_AUDIO_FRAME_SIZE;
+		audioFrameBuffer = (uint8_t *)av_malloc(audioBufferSize);
+		audioFrameSize = 0;
 	}
 	opened = true;
 	return opened;
@@ -431,6 +439,7 @@ void FFmpegDecoder::decodeVideoFrame(bool bFreePkt)
 			videoParam.width = videoCodecContext->width;
 			videoParam.height = videoCodecContext->height;
 			// allocate the video frame to be encoded
+			// todo use (AVPixelFormat)videoFrame.format
 			videoBufferSize = avpicture_get_size(videoCodecContext->pix_fmt, videoParam.width, videoParam.height);
 			videoFrameSize = 0;
 			videoFrameBuffer = (uint8_t *)av_malloc(videoBufferSize);
@@ -484,26 +493,23 @@ void FFmpegDecoder::decodeAudioFrame(bool bFreePkt)
 		(int16_t *)audioFrameBuffer, &outputFrameSize,
 		audioPacketData, audioPacketSize);
 #else
-	AVPacket pack;
+	AVPacket pack = {0};
 	pack.data = audioPacketData;
 	pack.size = audioPacketSize;
 	/*
-	decodedSize = avcodec_decode_audio3(audioCodecContext,
-	(int16_t *)audioFrameBuffer, &outputFrameSize,
-	&pack);
+	decodedSize = avcodec_decode_audio3(audioCodecContext, (int16_t *)audioFrameBuffer, &outputFrameSize, &pack);
 	*/
-	AVFrame* frame = av_frame_alloc();
+	AVFrame frame = {0};
 	int got_frame = 0;
-	decodedSize = avcodec_decode_audio4(audioCodecContext, frame, &got_frame, &pack);
+	decodedSize = avcodec_decode_audio4(audioCodecContext, &frame, &got_frame, &pack);
 	if (got_frame){
-		outputFrameSize = frame->nb_samples * frame->channels;
-		memcpy(audioFrameBuffer, frame->data, outputFrameSize);
+		outputFrameSize = av_samples_get_buffer_size(NULL, frame.channels, frame.nb_samples, (AVSampleFormat)frame.format, 0);
+		// outputFrameSize = frame.nb_samples * frame.channels * sizeof(short);
+		memcpy(audioFrameBuffer, frame.data[0], outputFrameSize);
 	}
-	av_frame_free(&frame);
 #endif
 
 	audioFrameSize = outputFrameSize;
-
 	if (audioPacketSize - decodedSize <= 0)
 	{
 		// all the audio frames in the packet have been decoded
@@ -565,6 +571,7 @@ bool FFmpegDecoder::split(const char * inFile, const char * outFile, double star
 				if (r == 0 && wait_key) {
 					if (pack->flags & AV_PKT_FLAG_KEY) {
 						wait_key = false;
+						enc.writeVideoFrame(NULL, pack->dts);
 						// save keyframe data
 						enc.writeVideoData(pack->data, pack->size, true, dec.getPresentTimeStamp() * 1000);
 					}

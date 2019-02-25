@@ -54,8 +54,8 @@ FFmpegEncoder::FFmpegEncoder(const FFmpegVideoParam &videoParam, const FFmpegAud
 	img_convert_ctx = NULL;
 	m_pResample = NULL;
 	reqKeyFrame = false;
-	audioPkt = new AVPacket();
-	videoPkt = new AVPacket();
+	audioPkt = (AVPacket*)av_mallocz(sizeof(AVPacket));
+	videoPkt = (AVPacket*)av_mallocz(sizeof(AVPacket));
 	// initialize libavcodec, and register all codecs and formats
 	av_register_all();
 }
@@ -64,8 +64,14 @@ FFmpegEncoder::~FFmpegEncoder()
 {
 	close();
 	delete m_pMutex;
-	delete audioPkt;
-	delete videoPkt;
+	if (audioPkt){
+		av_packet_unref(audioPkt);
+		av_freep(&audioPkt);
+	}
+	if (videoPkt){
+		av_packet_unref(videoPkt);
+		av_freep(&videoPkt);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -79,14 +85,19 @@ const uint8_t *FFmpegEncoder::getVideoEncodedBuffer() const
 	return videoPkt ? videoPkt->data : NULL;
 }
 
-bool FFmpegEncoder::getVideoEncodeType()
+bool isKeyFrame(AVFrame* f)
+{// 主要以前者为判断，后者好像现在没设置了
+	return f->pict_type == AV_PICTURE_TYPE_I || f->key_frame == 1;
+}
+
+int FFmpegEncoder::getVideoEncodeType()
 {
 	if (videoPkt){
 		return videoPkt->flags;
 	}
 	/*
 	if(videoCodecContext && videoCodecContext->coded_frame){
-	return isKeyFrame(videoCodecContext->coded_frame);
+		return isKeyFrame(videoCodecContext->coded_frame);
 	}*/
 	return 0;
 }
@@ -139,7 +150,6 @@ int FFmpegEncoder::getAudioFrameSize() const
 	{
 		return 0;
 	}
-	return audioBufferSize;
 
 	int frameSize = 0;
 	AVCodecContext* c = audioCodecContext;
@@ -185,7 +195,8 @@ int FFmpegEncoder::encodeVideoFrame(const uint8_t *frameData)
 
 	// encode the image frame
 	AVPicture picture;
-	avpicture_fill(&picture, (uint8_t *)frameData, (AVPixelFormat)videoParam.pixelFormat, videoParam.width, videoParam.height);
+	avpicture_fill(&picture, (uint8_t *)frameData, 
+		(AVPixelFormat)videoParam.pixelFormat, videoParam.width, videoParam.height);
 	return encodeVideoData(&picture);
 }
 
@@ -208,13 +219,14 @@ int FFmpegEncoder::writeVideoFrame(const uint8_t *frameData, int64_t tsp)
 
 	// encode the image
 	AVPicture picture;
-	avpicture_fill(&picture, (uint8_t *)frameData, (AVPixelFormat)videoParam.pixelFormat, videoParam.width, videoParam.height);
+	avpicture_fill(&picture, (uint8_t *)frameData, 
+		(AVPixelFormat)videoParam.pixelFormat, videoParam.width, videoParam.height);
 	int encodedSize = encodeVideoData(&picture, tsp);
 
 	// output the encoded image data
 	if (encodedSize > 0)
 	{
-		writePack(true);
+		writePacket(true);
 	}
 	return encodedSize;
 }
@@ -272,7 +284,7 @@ int FFmpegEncoder::writeAudioFrame(const uint8_t *frameData, int dataSize)
 	// output the encoded audio data
 	if (encodedSize > 0)
 	{
-		writePack(false);
+		writePacket(false);
 		//writeAudioData(audioBuffer, encodedSize);
 	}
 	return encodedSize;
@@ -286,7 +298,7 @@ void FFmpegEncoder::open(const char *fileName, bool openCodec)
 		throw runtime_error("The encoder is already opened. Call close before opening a new encoder.");
 	}
 
-	hasOutput = (fileName != NULL) && (fileName[0] != 0);
+	hasOutput = (fileName && fileName[0]);
 	if (!hasOutput && !videoParam.codecId && !audioParam.codecId)
 	{
 		throw invalid_argument("The encoder must have output file or video/audio codec set.");
@@ -372,13 +384,13 @@ void FFmpegEncoder::open(const char *fileName, bool openCodec)
 		// 不允许B帧被引用
 		av_opt_set(videoCodecContext->priv_data, "b-pyramid", "none", 0);
 		videoCodecContext->max_b_frames = 2;
-		/* // x264额外编码参数
+		/* 
+		// x264额外编码参数
 		// videoCodecContext->rc_strategy;
 		if(videoCodec->id == AV_CODEC_ID_H264){
-		av_opt_set(videoCodecContext->priv_data, "preset", "veryfast", 0);
-		// av_opt_set(videoCodecContext->priv_data, "preset", "superfast", 0);
-		// 实时编码关键看这句，上面那条无所谓
-		av_opt_set(videoCodecContext->priv_data, "tune", "zerolatency", 0);
+			av_opt_set(videoCodecContext->priv_data, "preset", "veryfast", 0); // "superfast"
+			// 实时编码关键看这句，上面那条无所谓
+			av_opt_set(videoCodecContext->priv_data, "tune", "zerolatency", 0);
 		}
 		videoCodecContext->qcompress = 0.0;//0.0 => CBR, 1.0 => CQP. Recommended default: -qcomp 0.60
 		// 最大关键帧距
@@ -393,7 +405,6 @@ void FFmpegEncoder::open(const char *fileName, bool openCodec)
 		videoCodecContext->rc_min_rate = videoParam.bitRate/10;//1000;
 		videoCodecContext->rc_max_rate = videoParam.bitRate;
 		// videoCodecContext->bit_rate_tolerance = videoParam.bitRate;
-		/// END
 		*/
 
 		// set the PixelFormat of the target encoded video
@@ -419,7 +430,7 @@ void FFmpegEncoder::open(const char *fileName, bool openCodec)
 			// allocate the temporal video frame buffer for pixel format conversion if needed
 			if (videoParam.pixelFormat != videoCodecContext->pix_fmt)
 			{
-				videoFrame = (AVPicture *)av_malloc(sizeof(AVPicture));
+				videoFrame = (AVPicture *)av_mallocz(sizeof(AVPicture));
 				if (videoFrame == NULL
 					|| avpicture_alloc(videoFrame, videoCodecContext->pix_fmt, videoCodecContext->width, videoCodecContext->height) < 0)
 				{
@@ -659,8 +670,6 @@ int FFmpegEncoder::encodeVideoData(AVPicture *picture, int64_t tsp)
 	av_init_packet(videoPkt);
 	int got_packet;
 	int ret = avcodec_encode_video2(videoCodecContext, videoPkt, &frame, &got_packet);
-	// encode the frame
-	// int encodedSize = avcodec_encode_video(videoCodecContext, videoBuffer, videoBufferSize, frame);	
 	if (!ret && got_packet && videoPkt->size) {
 		AVFrame* pCoded = videoCodecContext->coded_frame;
 		printf("%d：%d\n", pCoded->pict_type, videoPkt->size);
@@ -676,7 +685,7 @@ int FFmpegEncoder::encodeVideoData(AVPicture *picture, int64_t tsp)
 		/* 不能丢失P帧否则马赛克N多
 		static int pCount = 0;
 		if (pCoded->pict_type == AV_PICTURE_TYPE_P){
-		if (pCount++ % 3)return 0;
+			if (pCount++ % 3)return 0;
 		}*/
 		if (isPacketKey(videoPkt))
 			reqKeyFrame = 0;
@@ -689,17 +698,20 @@ int FFmpegEncoder::encodeVideoData(AVPicture *picture, int64_t tsp)
 		return 0;
 	}
 	/*
+	// encode the frame
+	int encodedSize = avcodec_encode_video(videoCodecContext, videoBuffer, videoBufferSize, frame);
 	if (encodedSize < 0)
 	{
-	throw runtime_error("Error while encoding the video frame.");
+		throw runtime_error("Error while encoding the video frame.");
 	}
 	else
 	{
-	return encodedSize;
-	}*/
+		return encodedSize;
+	}
+	*/
 }
 
-void FFmpegEncoder::writePack(int type)
+void FFmpegEncoder::writePacket(int type)
 {
 	AVPacket* pkt = NULL;
 	if (type)
@@ -796,7 +808,7 @@ int FFmpegEncoder::encodeAudioData(uint8_t *frameData, int dataSize)
 	//avcodec_get_frame_defaults(&frame);
 
 	if (!m_pResample){
-		// 不这么设的话，好像avcodec_fill_audio_frame不工作
+		// 不这么设的话，avcodec_fill_audio_frame不工作
 		frame.nb_samples = dataSize / audioParam.channels / av_get_bytes_per_sample(audioParam.sampleFormat);
 		avcodec_fill_audio_frame(&frame, audioParam.channels, audioParam.sampleFormat, frameData, dataSize, 0);
 	}
@@ -844,8 +856,6 @@ void FFmpegEncoder::writeAudioData(uint8_t *packetData, int packetSize, uint64_t
 	// write the compressed frame in the media file
 	int success = av_write_frame(outputContext, &packet);
 
-	av_free_packet(&packet);
-
 	if (success < 0)
 	{
 		throw runtime_error("Error while writing audio frame.");
@@ -869,7 +879,7 @@ int64_t FFmpegEncoder::ms2pts(bool bAudio, int ms)
 
 int64_t FFmpegEncoder::ms2pts(AVStream* pStream, int ms)
 {
-	return pStream ? (int64_t)ms*pStream->time_base.den / pStream->time_base.num / 1000 : 0;
+	return pStream ? (int64_t)ms * pStream->time_base.den / pStream->time_base.num / 1000 : 0;
 }
 
 void FFmpegEncoder::RlsResample()

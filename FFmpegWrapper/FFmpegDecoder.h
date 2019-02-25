@@ -149,12 +149,17 @@ public:
 	///
 	void open(const char *fileName);
 	/*
-	打开解码器
+	open audio/video decoder, and use as normal decoder
+	@see decodeAudioFrame/decodeVideoFrame
 	@param vPar 视频参数
 	@param aPar 音频参数
 	@return bool 成功则返回true
 	*/
 	bool open(const FFmpegVideoParam& vPar, const FFmpegAudioParam& aPar);
+	// use as normal decoder..
+	int decodeAudioFrame(uint8_t* data, int size);
+	int decodeVideoFrame(uint8_t* data, int size);
+
 	///
 	/// @brief  Close the input file, codecs, and release the memories.
 	///
@@ -177,8 +182,6 @@ public:
 	///
 	int decodeFrame();
 
-	int decodeAudioFrame(uint8_t* data, int size);
-	int decodeVideoFrame(uint8_t* data, int size);
 	///
 	/// @brief  Read a packet from the input file
 	///
@@ -192,8 +195,9 @@ public:
 	const uint8_t *getRawFrame() const;
 	/// get current packet data buffer size
 	int getRawFrameSize() const;
-	/// 返回当前读取的包(必须包含FFMPEG头文件后才能解析)
+	/// 返回当前读取的包(须包含FFMPEG头文件, 才能解析)
 	AVPacket* getCurPacket();
+
 	int seek(double sec);
 	static bool split(const char* src, const char* dst, double start, double end);
 	static bool split2(const char* src, const char* dst, double start, double end);
@@ -213,7 +217,6 @@ private:
 	AVFormatContext *inputContext;      ///< The input format context
 	AVStream *videoStream;              ///< The video output stream
 	AVStream *audioStream;              ///< The audio output stream
-	// 采用指针防止头文件污染
 	AVPacket *currentPacket;		///< the packet read from the input file currently
 	// yuv
 	uint8_t *videoFrameBuffer;  ///< The buffer storing one output video frame data

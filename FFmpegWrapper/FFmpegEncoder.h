@@ -101,7 +101,7 @@ public:
 	///
 	const uint8_t *getVideoEncodedBuffer() const;
 	/// 判断上一帧视频类型
-	bool getVideoEncodeType();
+	int getVideoEncodeType();
 	///
 	/// @brief  Get the presentation time stamp of the video stream being encoded.
 	///
@@ -231,6 +231,7 @@ public:
 	/// @return A non-negative int representing the size of the encoded buffer.
 	///
 	int writeAudioFrame(const uint8_t *frameData, int dataSize = 0);
+
 	/// 将ms转成pts
 	inline int64_t ms2pts(AVStream* pStream, int ms);
 	inline int64_t ms2pts(bool bAudio, int ms);
@@ -248,8 +249,8 @@ public:
 	/// @param  [in] packetSize  The size of the encoded video frame data
 	///
 	void writeVideoData(uint8_t *packetData, int packetSize, bool bKey, uint64_t tsp = 0xFFFFFFFF);
-	/// 请求压一个视频关键帧
-	void ReqKeyFrame(){ reqKeyFrame = true; }
+
+
 	/*
 	设置翻转标记，对整个编码过程生效
 	@param vFlip 上下翻转
@@ -257,16 +258,19 @@ public:
 	*/
 	void SetFlip(bool vFlip, bool uvFlip){ bFlipV = vFlip; bFlipUV = uvFlip; }
 	bool bFlipV, bFlipUV;
+
 	bool hasAudio(){ return encodeAudio; }
 	bool hasVideo(){ return encodeVideo; }
 	bool isOpen(){ return opened; }
+	/// 请求压一个视频关键帧
+	void ReqKeyFrame(){ reqKeyFrame = true; }
 private:
+	volatile bool reqKeyFrame; ///< Whether encode keyframe in next video 
 	//////////////////////////////////////////////////////////////////////////
 	//
 	//  Private Definitions
 	//
 	//////////////////////////////////////////////////////////////////////////
-	volatile bool reqKeyFrame;
 	bool encodeVideo;   ///< Whether video encoding is needed
 	bool encodeAudio;   ///< Whether audio encoding is needed
 	bool hasOutput;     ///< Whether there is a output file for encoding
@@ -309,7 +313,7 @@ private:
 	///
 	int encodeVideoData(AVPicture *picture, int64_t tsp = AV_NOPTS_VALUE);
 
-	void writePack(int type);
+	void writePacket(int type);
 	///
 	/// @brief  Convert the pixel format of the input image
 	///
