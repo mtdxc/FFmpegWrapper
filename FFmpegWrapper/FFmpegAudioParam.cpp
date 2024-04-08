@@ -64,7 +64,7 @@ bool FFmpegAudioParam::Read( AVCodecContext* ctx )
 
 bool FFmpegAudioParam::isDiff( AVCodecContext* codec )
 {
-	return ( channels!=codec->channels
+	return ( channels != codec->channels
 		|| sampleFormat != codec->sample_fmt 
 		|| sampleRate != codec->sample_rate);
 }

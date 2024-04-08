@@ -66,7 +66,7 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swscale.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avcodec.lib;avformat.lib;avfilter.lib;avutil.lib;swscale.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>../FFmpeg/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
@@ -95,7 +95,7 @@
       <DataExecutionPrevention>
       </DataExecutionPrevention>
       <TargetMachine>MachineX86</TargetMachine>
-      <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swscale.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avcodec.lib;avformat.lib;avfilter.lib;avutil.lib;swscale.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>../FFmpeg/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -104,6 +104,7 @@
     <ClCompile Include="FFmpegAudioParam.cpp" />
     <ClCompile Include="FFmpegDecoder.cpp" />
     <ClCompile Include="FFmpegEncoder.cpp" />
+    <ClCompile Include="FFmpegFilter.cpp" />
     <ClCompile Include="FFmpegVideoParam.cpp" />
     <ClCompile Include="Resample.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -115,6 +116,7 @@
     <ClInclude Include="FFmpegAudioParam.h" />
     <ClInclude Include="FFmpegDecoder.h" />
     <ClInclude Include="FFmpegEncoder.h" />
+    <ClInclude Include="FFmpegFilter.h" />
     <ClInclude Include="FFmpegVideoParam.h" />
     <ClInclude Include="Resample.h" />
     <ClInclude Include="stdafx.h" />
